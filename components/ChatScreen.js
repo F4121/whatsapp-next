@@ -1,6 +1,6 @@
 import { Avatar } from '@material-ui/core';
 import { useRouter } from 'next/router';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import styled from 'styled-components';
 import { auth, db } from '../firebase';
@@ -11,11 +11,13 @@ import { InsertEmoticon, Mic, SettingsInputAntenna } from '@material-ui/icons';
 import firebase from 'firebase';
 import Message from './Message';
 import getRecipientEmail from '../utils/getRecipientEmail';
+import TimeAgo from 'timeago-react';
 
 const ChatScreen = ({ chat, messages }) => {
   const [user] = useAuthState(auth);
   const router = useRouter();
   const [input, setInput] = useState();
+  const endOfMessageRef = useRef(null);
   const [messagesSnapshot] = useCollection(
     db
       .collection('chats')
@@ -23,31 +25,42 @@ const ChatScreen = ({ chat, messages }) => {
       .collection('messages')
       .orderBy('timestamp', 'asc')
   );
+  const [recipientSnapshot] = useCollection(
+    db
+      .collection('users')
+      .where('email', '==', getRecipientEmail(chat.users, user))
+  );
 
   const showMessages = () => {
     if (messagesSnapshot) {
       return messagesSnapshot.docs.map((message) => (
-        <Message
-          key={message.id}
-          user={message.data().user}
-          message={{
-            ...message.data(),
-            timestamp: message.data().timestamp?.toDate().getTime(),
-          }}
-        />
+        <>
+          {console.log(`ATAS :`, message)}
+          <Message
+            key={message?.id}
+            user={message?.data()?.user}
+            message={{
+              ...message?.data(),
+              timestamp: message?.data()?.timestamp?.toDate().getTime(),
+            }}
+          />
+        </>
       ));
     } else {
       return JSON.parse(messages).map((message) => (
-        <Message
-          key={message.id}
-          user={message.data().user}
-          message={{
-            ...message.data(),
-            timestamp: message.data().timestamp?.toDate().getTime(),
-          }}
-        />
+        <>
+          {console.log(`BAWAH :`, message)}
+          <Message key={message.id} user={message.user} message={message} />
+        </>
       ));
     }
+  };
+
+  const scrollToBottom = () => {
+    endOfMessageRef.current.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
   };
 
   const sendMessage = (e) => {
@@ -66,17 +79,34 @@ const ChatScreen = ({ chat, messages }) => {
     });
 
     setInput('');
+    scrollToBottom();
   };
 
+  const recipient = recipientSnapshot?.docChanges?.docs?.[0].data();
   const recipientEmail = getRecipientEmail(chat.users, user);
 
   return (
     <Container>
       <Header>
-        <Avatar />
+        {recipient ? (
+          <Avatar src={recipient?.photoURL} />
+        ) : (
+          <Avatar>{recipientEmail[0]}</Avatar>
+        )}
         <HeaderInformation>
-          <h3>Recipient Email</h3>
-          <p>Last seen ...</p>
+          <h3>{recipientEmail}</h3>
+          {recipientSnapshot ? (
+            <p>
+              Last active: {` `}
+              {recipient?.lastSeen?.toDate() ? (
+                <TimeAgo datetime={recipient?.lastSeen?.toDate()} />
+              ) : (
+                'Unavailable'
+              )}
+            </p>
+          ) : (
+            <p>Loading Last active... </p>
+          )}
         </HeaderInformation>
         <HeaderIcon>
           <IconButton>
@@ -88,15 +118,12 @@ const ChatScreen = ({ chat, messages }) => {
 
       <MessageContainer>
         {showMessages()}
-        <EndOfMessage />
+        <EndOfMessage ref={endOfMessageRef} />
       </MessageContainer>
 
       <InputContainer>
         <InsertEmoticon />
-        <Input
-          value={input}
-          onChange={(e) => SettingsInputAntenna(e.target.value)}
-        />
+        <Input value={input} onChange={(e) => setInput(e.target.value)} />
         <button hidden disabled={!input} type='submit' onClick={sendMessage}>
           Send Message
         </button>
@@ -169,4 +196,6 @@ const MessageContainer = styled.div`
   min-height: 90vh;
 `;
 
-const EndOfMessage = styled.div``;
+const EndOfMessage = styled.div`
+  margin-bottom: 50px;
+`;
