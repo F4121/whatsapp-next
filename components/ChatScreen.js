@@ -35,7 +35,6 @@ const ChatScreen = ({ chat, messages }) => {
     if (messagesSnapshot) {
       return messagesSnapshot.docs.map((message) => (
         <>
-          {console.log(`ATAS :`, message)}
           <Message
             key={message?.id}
             user={message?.data()?.user}
@@ -49,7 +48,6 @@ const ChatScreen = ({ chat, messages }) => {
     } else {
       return JSON.parse(messages).map((message) => (
         <>
-          {console.log(`BAWAH :`, message)}
           <Message key={message.id} user={message.user} message={message} />
         </>
       ));
